@@ -1,11 +1,14 @@
 use redis::{Commands, RedisError};
 
+use crate::fs_scanner::FileMetadata;
+
 const HOST: Option<&str> = option_env!("REDIS_HOST");
 const PORT: Option<&str> = option_env!("REDIS_PORT");
 const NAME: &str = env!("CLIENT_NAME", "Please add a name for the FIM client in config.toml");
 
 trait BrokerImpl {
     fn get_policy(&self) -> String;
+    fn get_file_info(&self, path: &str) -> Option<FileMetadata>;
 }
 
 pub enum BrokerType {
@@ -27,6 +30,10 @@ impl BrokerProxy {
     pub fn get_policy(&self) -> String {
         self._impl.get_policy()
     }
+
+    pub fn get_file_info(&self, path: &str) -> Option<FileMetadata> {
+        self._impl.get_file_info(path)
+    }
 }
 
 struct RedisBroker {
@@ -44,21 +51,35 @@ impl RedisBroker {
         }
         RedisBroker { _client: _client.unwrap() }
     }
-}
 
-impl BrokerImpl for RedisBroker {
-    fn get_policy(&self) -> String {
+    fn _get(&self, query: &str) -> Result<String, RedisError> {
         let mut conn = match self._client.get_connection() {
             Ok(conn) => conn,
             Err(reason) => panic!("Failed to connect to Redis: Reason {}", reason)
         };
 
-        let val: Result<String, RedisError> = conn.get(format!("{}_policy", NAME));
+        conn.get(query)
+    }
+}
+
+impl BrokerImpl for RedisBroker {
+    fn get_policy(&self) -> String {
+        
+        let val = self._get(format!("{}_policy", NAME).as_str());
 
         if let Err(reason) = val {
             panic!("Could not get policy for {}! Reason: {}", NAME, reason);
         }
 
         val.unwrap()
+    }
+
+    fn get_file_info(&self, path: &str) -> Option<FileMetadata> {
+        let val = self._get(path);
+        if val.is_err() {
+            return None;
+        }
+
+        Some(serde_json::from_str(&val.unwrap()).unwrap())
     }
 }

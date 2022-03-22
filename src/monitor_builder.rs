@@ -5,7 +5,7 @@ use crate::{
     sched_runner::ScheduleRunner, 
     watcher::DirWatcher, 
     fs_scanner::FilesystemScanner, 
-    schedule::{ISchedule, CronSchedule},
+    schedule::{ISchedule, CronSchedule, IntervalSchedule},
     broker_proxy::BrokerProxy
 };
 
@@ -40,6 +40,15 @@ pub fn build_monitors(policy: Policy, broker: BrokerProxy) -> (Option<DirWatcher
                     sched.dirs.clone(), 
                     sched.ignore_files.clone(), 
                     sched.ignore_dirs.clone()).unwrap()))
+            }
+
+            if let Some(int_sched) = sched.interval {
+                scheds.push(Box::new(IntervalSchedule::new(
+                    format!("{}", int_sched),
+                    sched.dirs.clone(),
+                    sched.ignore_files.clone(),
+                    sched.ignore_dirs.clone()
+                ).unwrap()))
             }
         }
 
