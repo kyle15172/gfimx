@@ -22,14 +22,13 @@ impl ScheduleRunner {
         loop {
             thread::sleep(time::Duration::from_millis(100));
             for schedule in &mut self.schedules {
-                match schedule.interrogate() {
-                    Some(paths) => {
-                        for path in paths.0 {
-                            let scanner = self.scanner.lock().unwrap();
-                            scanner.scan_dir(&path)
-                        }
-                    },
-                    None => {}
+
+
+                if let Some(paths) = schedule.interrogate() {
+                    for path in paths.0 {
+                        let scanner = self.scanner.lock().unwrap();
+                        scanner.scan_dir(path)
+                    }
                 }
             }
         }

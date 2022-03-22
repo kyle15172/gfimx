@@ -1,6 +1,12 @@
 use std::{sync::{Arc, Mutex}, borrow::Borrow};
 
-use crate::{policy_structs::Policy, sched_runner::ScheduleRunner, watcher::DirWatcher, fs_scanner::FilesystemScanner, schedule::{ISchedule, CronSchedule}};
+use crate::{
+    policy_structs::Policy, 
+    sched_runner::ScheduleRunner, 
+    watcher::DirWatcher, 
+    fs_scanner::FilesystemScanner, 
+    schedule::{ISchedule, CronSchedule}
+};
 
 pub fn build_monitors(policy: Policy) -> (Option<DirWatcher>, Option<ScheduleRunner>) {
 
@@ -27,6 +33,7 @@ pub fn build_monitors(policy: Policy) -> (Option<DirWatcher>, Option<ScheduleRun
                 panic!("Can't have cron and interval!");
             }
 
+            //TODO: Ensure that a new CronSchedule is successfully created before pushing it. 
             if let Some(cron_sched) = sched.cron.borrow() {
                 scheds.push(Box::new(CronSchedule::new(cron_sched.clone(), 
                     sched.dirs.clone(), 
