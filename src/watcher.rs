@@ -8,15 +8,22 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 
 use crate::fs_scanner::FilesystemScanner;
+use crate::policy_structs::Ignore;
 pub struct DirWatcher{
     watch_dirs: Vec<String>,
+    ignore_files: Option<Ignore>,
+    ignore_dirs: Option<Ignore>,
     scanner: Arc<Mutex<FilesystemScanner>>
 }
 
 impl DirWatcher {
 
-    pub fn new(watch_dirs: Vec<String>, scanner: Arc<Mutex<FilesystemScanner>>) -> Self {
-        DirWatcher { watch_dirs, scanner }
+    pub fn new(watch_dirs: Vec<String>, 
+               scanner: Arc<Mutex<FilesystemScanner>>, 
+               ignore_files: Option<Ignore>, 
+               ignore_dirs: Option<Ignore>) -> Self 
+    {
+        DirWatcher { watch_dirs, ignore_files, ignore_dirs, scanner }
     }
 
     pub fn watch(&self) {

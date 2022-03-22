@@ -1,11 +1,12 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::Utc;
 use cron_parser::parse;
-use regex::Regex;
+
+use crate::policy_structs::Ignore;
 
 pub trait ISchedule {
     /// Interrogates a schedule. If the schedule is due to be run, a list of paths will be returned.
-    fn interrogate(&mut self) -> Option<Vec<&String>>;
+    fn interrogate(&mut self) -> Option<(Vec<&String>, &Option<Ignore>, &Option<Ignore>)>;
 }
 
 /// Holds the data that scheduling classes will use.
@@ -15,7 +16,8 @@ pub trait ISchedule {
 struct Schedule {
     schedule: String,
     paths: Vec<String>,
-    filters: Vec<Regex>,
+    ignore_files: Option<Ignore>,
+    ignore_dirs: Option<Ignore>,
 }
 
 /// This schedule object uses a time interval to determine whether it should be run or not.
@@ -25,7 +27,11 @@ pub struct IntervalSchedule {
 }
 
 impl IntervalSchedule {
-    pub fn new(schedule: String, paths: Vec<String>, filter_expressions: Vec<String>) -> Result<Self, String> {
+    pub fn new(schedule: String, 
+               paths: Vec<String>, 
+               ignore_files: Option<Ignore>, 
+               ignore_dirs: Option<Ignore>) -> Result<Self, String> 
+    {
 
         let sched_interval = schedule.parse::<u64>();
 
@@ -37,21 +43,13 @@ impl IntervalSchedule {
         let since_the_epoch = start
             .duration_since(UNIX_EPOCH).unwrap().as_secs();
 
-        let mut filters: Vec<Regex> = Vec::new();
-
-        for expr in filter_expressions {
-
-            match Regex::new(expr.as_str()) {
-                Ok(reg) => filters.push(reg),
-                Err(_) => return Err(format!("IntervalSchedule was passed an invalid filter expression: {}", expr))
-            }
-        }
 
         Ok(IntervalSchedule {
             schedule: Schedule{
                 schedule,
                 paths,
-                filters
+                ignore_files,
+                ignore_dirs
             },
             next_run: since_the_epoch + sched_interval.unwrap()
         })
@@ -59,21 +57,16 @@ impl IntervalSchedule {
 }
 
 impl ISchedule for IntervalSchedule {
-    fn interrogate(&mut self) -> Option<Vec<&String>> {
+    fn interrogate(&mut self) -> Option<(Vec<&String>, &Option<Ignore>, &Option<Ignore>)> {
         let start = SystemTime::now();
         let since_the_epoch = start
             .duration_since(UNIX_EPOCH).unwrap().as_secs();
         
         if since_the_epoch > self.next_run {
             self.next_run = self.schedule.schedule.parse::<u64>().unwrap() + since_the_epoch;
-            Some(self.schedule.paths.iter().filter_map(|e| {
-                for r in &self.schedule.filters {
-                    if r.is_match(&e) {
-                        return None;
-                    }
-                }
-                return Some(e);
-            }).collect())
+            Some((self.schedule.paths.iter().filter_map(|e| {
+                Some(e)
+            }).collect(), &self.schedule.ignore_files, &self.schedule.ignore_dirs))
         } else {
             None
         }
@@ -85,35 +78,30 @@ pub struct CronSchedule {
 }
 
 impl CronSchedule {
-    pub fn new(schedule: String, paths: Vec<String>, filter_expressions: Vec<String>) -> Result<Self, String> {
+    pub fn new(schedule: String, 
+               paths: Vec<String>, 
+               ignore_files: Option<Ignore>, 
+               ignore_dirs: Option<Ignore>) -> Result<Self, String> 
+    {
 
         //Ensure that the cron schedule passed is valid before constructing the object
         if let Err(_) = parse(&schedule, &Utc::now()) {
             return Err(format!("CronSchedule expected cron schedule, got {}", schedule))
         }
 
-        let mut filters: Vec<Regex> = Vec::new();
-
-        for expr in filter_expressions {
-
-            match Regex::new(expr.as_str()) {
-                Ok(reg) => filters.push(reg),
-                Err(_) => return Err(format!("CronSchedule was passed an invalid filter expression: {}", expr))
-            }
-        }
-
         Ok(CronSchedule{
             schedule: Schedule { 
                 schedule, 
                 paths, 
-                filters
+                ignore_files,
+                ignore_dirs
             }
         })    
     }
 }
 
 impl ISchedule for CronSchedule {
-    fn interrogate(&mut self) -> Option<Vec<&String>> {
+    fn interrogate(&mut self) -> Option<(Vec<&String>, &Option<Ignore>, &Option<Ignore>)> {
 
         let cron_sched: u64 = parse(&self.schedule.schedule, &Utc::now()).unwrap().timestamp().try_into().unwrap();
         let start = SystemTime::now();
@@ -121,14 +109,9 @@ impl ISchedule for CronSchedule {
             .duration_since(UNIX_EPOCH).unwrap().as_secs();
 
         if since_the_epoch >= cron_sched {
-            Some(self.schedule.paths.iter().filter_map(|e| {
-                for r in &self.schedule.filters {
-                    if r.is_match(&e) {
-                        return None;
-                    }
-                }
-                return Some(e);
-            }).collect::<Vec<&String>>())
+            Some((self.schedule.paths.iter().filter_map(|e| {
+                Some(e)
+            }).collect::<Vec<&String>>(), &self.schedule.ignore_files, &self.schedule.ignore_dirs))
         } else {
             None
         }
