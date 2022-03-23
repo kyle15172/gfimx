@@ -2,6 +2,7 @@ use notify::{RecommendedWatcher, Watcher, RecursiveMode, DebouncedEvent};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use std::sync::mpsc::channel;
+use log::error;
 
 use crate::fs_scanner::FilesystemScanner;
 use crate::policy_structs::Ignore;
@@ -35,7 +36,8 @@ impl DirWatcher {
             let res = watcher.watch(dir, RecursiveMode::Recursive);
 
             if let Err(r) = res {
-                panic!("DirWatcher cannot watch directory {}! Reason: {}", dir, r)
+                error!("DirWatcher cannot watch directory {}! Reason: {}", dir, r);
+                panic!()
             }
         }
 
@@ -55,7 +57,7 @@ impl DirWatcher {
                         
                     }
                 }
-                Err(e) => println!("watch error: {:?}", e),
+                Err(e) => error!("watch error: {:?}", e),
             }
         }
     }    

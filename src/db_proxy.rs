@@ -5,6 +5,9 @@ use mongodb::{
 
 use crate::file_metadata::FileMetadata;
 
+const HOST: Option<&str> = option_env!("MONGO_HOST");
+const PORT: Option<&str> = option_env!("MONGO_PORT");
+
 pub enum DatabaseType {
     MongoDB,    
 }
@@ -50,7 +53,10 @@ impl MongoDbConnector {
 impl DatabaseImpl for MongoDbConnector {
     fn connect(&mut self) -> Result<(), String> {
 
-        let client = Client::with_uri_str("mongodb://192.168.1.157:27017");
+        let host = HOST.ok_or("MONGO_HOST variable not set!")?;
+        let port = PORT.unwrap_or("27017");
+
+        let client = Client::with_uri_str(format!("mongodb://{}:{}", host, port));
 
         if let Err(reason) = &client {
             return Err(format!("{}", reason));
