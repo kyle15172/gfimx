@@ -11,7 +11,7 @@ pub enum DatabaseType {
 
 pub trait DatabaseImpl {
     fn connect(&mut self) -> Result<(), String>;
-    fn get_file(&self, file_name: &str) -> Option<FileMetadata>;
+    fn get_file(&self, file_name: &str) -> Result<Option<FileMetadata>, String>;
     fn upsert(&self, file_info: FileMetadata) -> Result<(), String>;
 }
 
@@ -20,15 +20,15 @@ pub struct DatabaseProxy {
 }
 
 impl DatabaseProxy {
-    pub fn new(dbtype: DatabaseType) -> Self {
+    pub fn new(dbtype: DatabaseType) -> Result<Self, String> {
         let mut db: Box<dyn DatabaseImpl + Send> = match dbtype {
             DatabaseType::MongoDB => Box::new(MongoDbConnector::new())
         };
-        db.connect();
-        DatabaseProxy { _impl: db }
+        db.connect()?;
+        Ok(DatabaseProxy { _impl: db })
     }
 
-    pub fn get_file(&self, file_name: &str) -> Option<FileMetadata> {
+    pub fn get_file(&self, file_name: &str) -> Result<Option<FileMetadata>, String> {
         self._impl.get_file(file_name)
     }
 
@@ -49,15 +49,27 @@ impl MongoDbConnector {
 
 impl DatabaseImpl for MongoDbConnector {
     fn connect(&mut self) -> Result<(), String> {
+
+        let client = Client::with_uri_str("mongodb://192.168.1.157:27017");
+
+        if let Err(reason) = &client {
+            return Err(format!("{}", reason));
+        }
+
         self._db = Some(
-            Client::with_uri_str("mongodb://192.168.1.157:27017").unwrap().database("test")
+            client.unwrap().database("test")
         );
         Ok(())
     }
 
-    fn get_file(&self, file_name: &str) -> Option<FileMetadata> {
+    fn get_file(&self, file_name: &str) -> Result<Option<FileMetadata>, String> {
         let collection = self._db.as_ref().unwrap().collection::<FileMetadata>("test_files");
-        collection.find_one(doc! { "path": file_name }, None).unwrap()        
+
+        let result =collection.find_one(doc! { "path": file_name }, None);
+        return match result {
+            Ok(val) => Ok(val),
+            Err(reason) => Err(format!("{}", reason))
+        };
     }
 
     fn upsert(&self, file_info: FileMetadata) -> Result<(), String> {

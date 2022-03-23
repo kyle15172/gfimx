@@ -11,6 +11,8 @@ use crate::{
 
 pub fn build_monitors(policy: Policy, broker: BrokerProxy, database: DatabaseProxy) -> (Option<DirWatcher>, Option<ScheduleRunner>) {
 
+    let mut _broker = broker.clone();
+
     let checker = Arc::new(Mutex::new(FilesystemScanner::new(broker, database)));
     let watcher: Option<DirWatcher> = if let Some(watch_policy) = policy.watch {
 
@@ -31,24 +33,42 @@ pub fn build_monitors(policy: Policy, broker: BrokerProxy, database: DatabasePro
 
         for sched in schedules.values() {
             if sched.cron.is_some() && sched.interval.is_some() {
-                panic!("Can't have cron and interval!");
+                _broker.log("Cannot have a schedule with both a cron and interval schedule!".to_owned());
+                panic!();
             }
 
             //TODO: Ensure that a new CronSchedule is successfully created before pushing it. 
             if let Some(cron_sched) = sched.cron.borrow() {
-                scheds.push(Box::new(CronSchedule::new(cron_sched.clone(), 
+
+                let new_sched = CronSchedule::new(
+                    cron_sched.clone(), 
                     sched.dirs.clone(), 
                     sched.ignore_files.clone(), 
-                    sched.ignore_dirs.clone()).unwrap()))
+                    sched.ignore_dirs.clone()
+                );
+
+                if let Err(reason) = new_sched {
+                    _broker.log(format!("Cannot make new CronSchedule: {}", reason));
+                    panic!();
+                }
+
+                scheds.push(Box::new(new_sched.unwrap()));
             }
 
             if let Some(int_sched) = sched.interval {
-                scheds.push(Box::new(IntervalSchedule::new(
-                    format!("{}", int_sched),
-                    sched.dirs.clone(),
-                    sched.ignore_files.clone(),
+                let new_sched = IntervalSchedule::new(
+                    format!("{}", int_sched), 
+                    sched.dirs.clone(), 
+                    sched.ignore_files.clone(), 
                     sched.ignore_dirs.clone()
-                ).unwrap()))
+                );
+
+                if let Err(reason) = new_sched {
+                    _broker.log(format!("Cannot make new IntervalSchedule: {}", reason));
+                    panic!();
+                }
+
+                scheds.push(Box::new(new_sched.unwrap()));
             }
         }
 

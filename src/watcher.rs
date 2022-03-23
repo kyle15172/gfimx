@@ -50,12 +50,6 @@ impl DirWatcher {
                         DebouncedEvent::Write(e) | DebouncedEvent::NoticeWrite(e)=> {
 
                             self.scanner.lock().unwrap().scan_dir(e.to_str().unwrap())
-
-                            // let input = File::open(&e)?;
-                            // let reader = BufReader::new(input);
-                            // let digest = sha256_digest(reader)?;
-
-                            // println!("This boio was changed: {}\nIt's hash is: {}", e.to_str().unwrap(), HEXLOWER.encode(digest.as_ref()))
                         },
                         _ => {}
                         

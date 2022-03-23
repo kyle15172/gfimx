@@ -64,9 +64,7 @@ impl ISchedule for IntervalSchedule {
         
         if since_the_epoch > self.next_run {
             self.next_run = self.schedule.schedule.parse::<u64>().unwrap() + since_the_epoch;
-            Some((self.schedule.paths.iter().filter_map(|e| {
-                Some(e)
-            }).collect(), &self.schedule.ignore_files, &self.schedule.ignore_dirs))
+            Some((self.schedule.paths.iter().collect(), &self.schedule.ignore_files, &self.schedule.ignore_dirs))
         } else {
             None
         }
@@ -85,7 +83,7 @@ impl CronSchedule {
     {
 
         //Ensure that the cron schedule passed is valid before constructing the object
-        if let Err(_) = parse(&schedule, &Utc::now()) {
+        if parse(&schedule, &Utc::now()).is_err() {
             return Err(format!("CronSchedule expected cron schedule, got {}", schedule))
         }
 
@@ -109,9 +107,7 @@ impl ISchedule for CronSchedule {
             .duration_since(UNIX_EPOCH).unwrap().as_secs();
 
         if since_the_epoch >= cron_sched {
-            Some((self.schedule.paths.iter().filter_map(|e| {
-                Some(e)
-            }).collect::<Vec<&String>>(), &self.schedule.ignore_files, &self.schedule.ignore_dirs))
+            Some((self.schedule.paths.iter().collect(), &self.schedule.ignore_files, &self.schedule.ignore_dirs))
         } else {
             None
         }

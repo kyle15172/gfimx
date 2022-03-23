@@ -17,13 +17,21 @@ use broker_proxy::{BrokerProxy, BrokerType};
 
 fn main() {
 
-    let broker = BrokerProxy::new(BrokerType::Redis);
+    let mut broker = BrokerProxy::new(BrokerType::Redis);
     let db = DatabaseProxy::new(DatabaseType::MongoDB);
 
-    let config: Policy = toml::from_str(broker.get_policy().as_str()).unwrap();
+    if let Err(reason) = &db {
+        broker.log(format!("Cannot connect to database: {}", reason))
+    }
+
+    let config = toml::from_str::<Policy>(broker.get_policy().as_str());
+
+    if let Err(reason) = &config {
+        broker.log(format!("Cannot parse policy: {}", reason));
+    }
 
 
-    let (watcher, runner) = build_monitors(config, broker, db);
+    let (watcher, runner) = build_monitors(config.unwrap(), broker, db.unwrap());
 
     let thr1 = thread::spawn(move || {
         if let Some(_watch) = watcher {

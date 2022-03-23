@@ -39,7 +39,7 @@ impl FilesystemScanner {
             let open_result = File::open(entry.path());
 
             if open_result.is_err() {
-                println!("Err");
+                self.broker.log(format!("Cannot work with file {}: Reason: {}", path, open_result.err().unwrap()));
                 continue;
             }
 
@@ -58,17 +58,23 @@ impl FilesystemScanner {
 
             let remote = self.database.get_file(format!("{}", path).as_str());
 
-            if remote.is_none() {
-                println!("{}", local);
-                self.database.upsert(local);
-            } else if remote.as_ref().unwrap() != &local {
-                println!("Old: {}\nNew: {}", remote.unwrap(), local);
-                self.database.upsert(local);
+            if let Err(reason) = &remote {
+                self.broker.log(format!("Error fetching remote file info: {}", reason));
+                continue;
             }
 
-            // if local != remote {
-            //     println!("{} : {:o} {} {} {}", path, perms, uid, gid, hash);
-            // }
+            if remote.as_ref().unwrap().is_none() {
+                println!("{}", local);
+
+                if let Err(reason) = self.database.upsert(local) {
+                    self.broker.log(format!("Could not upsert data! Reason: {}", reason));
+                }
+            } else if remote.as_ref().unwrap().as_ref().unwrap() != &local {
+                println!("Old: {}\nNew: {}", remote.unwrap().unwrap(), local);
+                if let Err(reason) = self.database.upsert(local) {
+                    self.broker.log(format!("Could not upsert data! Reason: {}", reason))
+                }
+            }
         }
     }
 }
