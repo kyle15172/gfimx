@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex};
+use log::error;
 
 use redis::{Commands, RedisError};
 
@@ -8,7 +9,7 @@ const NAME: &str = env!("CLIENT_NAME", "Please add a name for the FIM client in 
 
 trait BrokerImpl {
     fn get_policy(&self) -> String;
-    fn log(&mut self, msg: String);
+    fn log(&self, msg: String);
 }
 
 pub enum BrokerType {
@@ -31,7 +32,7 @@ impl BrokerProxy {
         self._impl.lock().expect("Eish...").get_policy()
     }
 
-    pub fn log(&mut self, msg: String) {
+    pub fn log(&self, msg: String) {
         self._impl.lock().expect("Eish...").log(msg);
     }
 }
@@ -53,7 +54,8 @@ impl RedisBroker {
 
         let _client = redis::Client::open(format!("redis://{}:{}/", host, port));
         if let Err(reason) = _client {
-            panic!("Could not connect to Redis! Reason: {}", reason);
+            error!("Could not connect to Redis! Reason: {}", reason);
+            panic!()
         }
         RedisBroker { _client: _client.unwrap() }
     }
@@ -61,7 +63,7 @@ impl RedisBroker {
     fn _get(&self, query: &str) -> Result<String, RedisError> {
         let mut conn = match self._client.get_connection() {
             Ok(conn) => conn,
-            Err(reason) => panic!("Failed to connect to Redis: Reason {}", reason)
+            Err(reason) => {error!("Failed to connect to Redis: Reason {}", reason); panic!()}
         };
 
         conn.get(query)
@@ -74,16 +76,17 @@ impl BrokerImpl for RedisBroker {
         let val = self._get(format!("{}_policy", NAME).as_str());
 
         if let Err(reason) = val {
-            panic!("Could not get policy for {}! Reason: {}", NAME, reason);
+            error!("Could not get policy for {}! Reason: {}", NAME, reason);
+            panic!()
         }
 
         val.unwrap()
     }
 
-    fn log(&mut self, msg: String) {
+    fn log(&self, msg: String) {
         let mut conn = match self._client.get_connection() {
             Ok(conn) => conn,
-            Err(reason) => panic!("Failed to connect to Redis: Reason {}", reason)
+            Err(reason) => {error!("Failed to connect to Redis: Reason {}", reason); panic!()}
         };
 
         let _: () = conn.lpush(format!("{}_log", NAME), msg).expect("Eish...");
