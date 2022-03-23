@@ -1,6 +1,6 @@
 use redis::{Commands, RedisError};
 
-use crate::fs_scanner::FileMetadata;
+use crate::file_metadata::FileMetadata;
 
 const HOST: Option<&str> = option_env!("REDIS_HOST");
 const PORT: Option<&str> = option_env!("REDIS_PORT");
@@ -8,7 +8,6 @@ const NAME: &str = env!("CLIENT_NAME", "Please add a name for the FIM client in 
 
 trait BrokerImpl {
     fn get_policy(&self) -> String;
-    fn get_file_info(&self, path: &str) -> Option<FileMetadata>;
 }
 
 pub enum BrokerType {
@@ -29,10 +28,6 @@ impl BrokerProxy {
 
     pub fn get_policy(&self) -> String {
         self._impl.get_policy()
-    }
-
-    pub fn get_file_info(&self, path: &str) -> Option<FileMetadata> {
-        self._impl.get_file_info(path)
     }
 }
 
@@ -72,14 +67,5 @@ impl BrokerImpl for RedisBroker {
         }
 
         val.unwrap()
-    }
-
-    fn get_file_info(&self, path: &str) -> Option<FileMetadata> {
-        let val = self._get(path);
-        if val.is_err() {
-            return None;
-        }
-
-        Some(serde_json::from_str(&val.unwrap()).unwrap())
     }
 }

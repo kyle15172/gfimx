@@ -6,12 +6,12 @@ use crate::{
     watcher::DirWatcher, 
     fs_scanner::FilesystemScanner, 
     schedule::{ISchedule, CronSchedule, IntervalSchedule},
-    broker_proxy::BrokerProxy
+    broker_proxy::BrokerProxy, db_proxy::DatabaseProxy
 };
 
-pub fn build_monitors(policy: Policy, broker: BrokerProxy) -> (Option<DirWatcher>, Option<ScheduleRunner>) {
+pub fn build_monitors(policy: Policy, broker: BrokerProxy, database: DatabaseProxy) -> (Option<DirWatcher>, Option<ScheduleRunner>) {
 
-    let checker = Arc::new(Mutex::new(FilesystemScanner::new(broker)));
+    let checker = Arc::new(Mutex::new(FilesystemScanner::new(broker, database)));
     let watcher: Option<DirWatcher> = if let Some(watch_policy) = policy.watch {
 
         Some(DirWatcher::new(
@@ -52,7 +52,7 @@ pub fn build_monitors(policy: Policy, broker: BrokerProxy) -> (Option<DirWatcher
             }
         }
 
-        Some(ScheduleRunner::new(Vec::new(), Arc::clone(&checker)))
+        Some(ScheduleRunner::new(scheds, Arc::clone(&checker)))
 
     } else {
         None

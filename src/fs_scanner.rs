@@ -4,29 +4,21 @@ use data_encoding::HEXLOWER;
 use ring::digest::{Context, Digest, SHA256};
 use std::fs::File;
 use std::io::{BufReader, Read};
-
-use serde_derive::Deserialize;
-
 use walkdir::WalkDir;
+
 use crate::broker_proxy::BrokerProxy;
+use crate::db_proxy::DatabaseProxy;
 
 pub struct FilesystemScanner{
-    broker: BrokerProxy
+    broker: BrokerProxy,
+    database: DatabaseProxy
 }
 
-#[derive(Deserialize)]
-pub struct FileMetadata {
-    pub path: String,
-    pub uid: u32,
-    pub gid: u32,
-    pub perms: u32,
-    pub hash: String
-}
 
 impl FilesystemScanner {
 
-    pub fn new(broker: BrokerProxy) -> Self {
-        FilesystemScanner { broker }
+    pub fn new(broker: BrokerProxy, database: DatabaseProxy) -> Self {
+        FilesystemScanner { broker, database }
     }
 
     pub fn scan_dir(&self, dir: &str) {
@@ -35,6 +27,9 @@ impl FilesystemScanner {
                 .into_iter()
                 .filter_map(|e| e.ok()) 
         {
+            if !entry.metadata().unwrap().is_file() {
+                continue;                
+            }
             let path = entry.path().to_string_lossy();
             let attrs = entry.metadata().unwrap().mode();
             let uid = entry.metadata().unwrap().uid();
@@ -45,7 +40,7 @@ impl FilesystemScanner {
             let digest = sha256_digest(reader).unwrap();
             let hash = HEXLOWER.encode(digest.as_ref());
 
-            let res = self.broker.get_file_info(&format!("{}", path));
+            let res:Option<()> = None;
 
             //TODO: Create FileMetadata object from existing data and compare the one you get from redis
             if res.is_none() {
