@@ -21,10 +21,19 @@ pub struct DatabaseProxy {
 
 impl DatabaseProxy {
     pub fn new(dbtype: DatabaseType) -> Self {
-        let db: Box<dyn DatabaseImpl + Send> = match dbtype {
+        let mut db: Box<dyn DatabaseImpl + Send> = match dbtype {
             DatabaseType::MongoDB => Box::new(MongoDbConnector::new())
         };
+        db.connect();
         DatabaseProxy { _impl: db }
+    }
+
+    pub fn get_file(&self, file_name: &str) -> Option<FileMetadata> {
+        self._impl.get_file(file_name)
+    }
+
+    pub fn upsert(&mut self, file_info: FileMetadata) -> Result<(), String> {
+        self._impl.upsert(file_info)
     }
 }
 
@@ -41,7 +50,7 @@ impl MongoDbConnector {
 impl DatabaseImpl for MongoDbConnector {
     fn connect(&mut self) -> Result<(), String> {
         self._db = Some(
-            Client::with_uri_str("mongodb://localhost:27017").unwrap().database("test")
+            Client::with_uri_str("mongodb://192.168.1.157:27017").unwrap().database("test")
         );
         Ok(())
     }

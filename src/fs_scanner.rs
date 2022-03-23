@@ -8,6 +8,7 @@ use walkdir::WalkDir;
 
 use crate::broker_proxy::BrokerProxy;
 use crate::db_proxy::DatabaseProxy;
+use crate::file_metadata::FileMetadata;
 
 pub struct FilesystemScanner{
     broker: BrokerProxy,
@@ -21,7 +22,7 @@ impl FilesystemScanner {
         FilesystemScanner { broker, database }
     }
 
-    pub fn scan_dir(&self, dir: &str) {
+    pub fn scan_dir(&mut self, dir: &str) {
         for entry in WalkDir::new(dir)
                 .follow_links(true)
                 .into_iter()
@@ -31,21 +32,43 @@ impl FilesystemScanner {
                 continue;                
             }
             let path = entry.path().to_string_lossy();
-            let attrs = entry.metadata().unwrap().mode();
+            let perms = entry.metadata().unwrap().mode();
             let uid = entry.metadata().unwrap().uid();
             let gid = entry.metadata().unwrap().gid();
 
-            let input = File::open(entry.path()).unwrap();
+            let open_result = File::open(entry.path());
+
+            if open_result.is_err() {
+                println!("Err");
+                continue;
+            }
+
+            let input = open_result.unwrap();
             let reader = BufReader::new(input);
             let digest = sha256_digest(reader).unwrap();
             let hash = HEXLOWER.encode(digest.as_ref());
 
-            let res:Option<()> = None;
+            let local = FileMetadata {
+                path: format!("{}", path),
+                uid,
+                gid,
+                perms,
+                hash                
+            };
 
-            //TODO: Create FileMetadata object from existing data and compare the one you get from redis
-            if res.is_none() {
-                println!("{} : {:o} {} {} {}", path, attrs, uid, gid, hash);
+            let remote = self.database.get_file(format!("{}", path).as_str());
+
+            if remote.is_none() {
+                println!("{}", local);
+                self.database.upsert(local);
+            } else if remote.as_ref().unwrap() != &local {
+                println!("Old: {}\nNew: {}", remote.unwrap(), local);
+                self.database.upsert(local);
             }
+
+            // if local != remote {
+            //     println!("{} : {:o} {} {} {}", path, perms, uid, gid, hash);
+            // }
         }
     }
 }

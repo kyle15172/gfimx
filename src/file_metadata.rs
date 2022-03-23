@@ -1,3 +1,5 @@
+use std::fmt::Display;
+
 use serde_derive::{Serialize, Deserialize};
 use mongodb::bson::{Document, doc};
 
@@ -19,5 +21,11 @@ impl FileMetadata {
             "perms": self.perms,
             "hash": self.hash.clone()
         }
+    }
+}
+
+impl Display for FileMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{{\n\tpath: {},\n\tuid: {},\n\tgid: {},\n\tperms: {:o},\n\thash: {}\n}}", self.path.clone(), self.uid, self.gid, self.perms, self.hash.clone())
     }
 }
