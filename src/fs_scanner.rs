@@ -1,18 +1,21 @@
 use std::os::unix::fs::MetadataExt;
+use std::path::Path;
 use notify::Result;
 use data_encoding::HEXLOWER;
 use ring::digest::{Context, Digest, SHA256};
 use std::fs::File;
 use std::io::{BufReader, Read};
 use walkdir::WalkDir;
-use log::error;
+use log::{error, info};
+use regex::Regex;
 
 use crate::broker_proxy::BrokerProxy;
 use crate::db_proxy::DatabaseProxy;
 use crate::file_metadata::FileMetadata;
+use crate::policy_structs::Ignore;
 
 pub struct FilesystemScanner{
-    broker: BrokerProxy,
+    _broker: BrokerProxy,
     database: DatabaseProxy
 }
 
@@ -20,18 +23,52 @@ pub struct FilesystemScanner{
 impl FilesystemScanner {
 
     pub fn new(broker: BrokerProxy, database: DatabaseProxy) -> Self {
-        FilesystemScanner { broker, database }
+        FilesystemScanner { _broker: broker, database }
     }
 
-    pub fn scan_dir(&mut self, dir: &str) {
+    pub fn scan_dir(&mut self, dir: &str, ignore_files: &Option<Ignore>, ignore_dirs: &Option<Ignore>) {
         for entry in WalkDir::new(dir)
                 .follow_links(true)
                 .into_iter()
                 .filter_map(|e| e.ok()) 
         {
+
             if !entry.metadata().unwrap().is_file() {
                 continue;                
             }
+
+            let pattern_filter = |ignore_struct: Option<Ignore>, e_path: &Path, e_pattern: &str| -> Option<()> {
+
+                let struct2 = ignore_struct.clone();
+
+                for path in ignore_struct?.paths? {
+                    if e_path.starts_with(path) { return Some(()) };
+                }
+
+                for pattern in struct2?.patterns? {
+                    let reg = Regex::new(pattern.as_str()).unwrap_or_else(
+                        |e: regex::Error| -> Regex {
+                            error!("Cannot compile pattern: {} Reason: {}", pattern, e); 
+                            panic!()
+                        }
+                    );
+                    if reg.is_match(e_pattern) {
+                        return Some(());
+                    }
+                }
+                None
+            };
+
+            if pattern_filter(ignore_dirs.clone(), entry.path(), entry.path().parent().unwrap().to_str().unwrap()).is_some() {
+                info!("Ignored file: {}", entry.path().to_string_lossy());
+                continue;
+            }
+
+            if pattern_filter(ignore_files.clone(), entry.path(), entry.file_name().to_str().unwrap()).is_some() {
+                info!("Ignored file: {}", entry.path().to_string_lossy());
+                continue;
+            }
+
             let path = entry.path().to_string_lossy();
             let perms = entry.metadata().unwrap().mode();
             let uid = entry.metadata().unwrap().uid();

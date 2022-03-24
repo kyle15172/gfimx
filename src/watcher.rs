@@ -51,7 +51,7 @@ impl DirWatcher {
                     match event {
                         DebouncedEvent::Write(e) | DebouncedEvent::NoticeWrite(e)=> {
 
-                            self.scanner.lock().unwrap().scan_dir(e.to_str().unwrap())
+                            self.scanner.lock().unwrap().scan_dir(e.to_str().unwrap(), &self.ignore_files, &self.ignore_dirs)
                         },
                         _ => {}
                         

@@ -27,7 +27,7 @@ impl ScheduleRunner {
                 if let Some(paths) = schedule.interrogate() {
                     for path in paths.0 {
                         let mut scanner = self.scanner.lock().unwrap();
-                        scanner.scan_dir(path)
+                        scanner.scan_dir(path, paths.1, paths.2)
                     }
                 }
             }
