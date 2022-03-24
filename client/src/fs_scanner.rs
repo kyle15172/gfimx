@@ -8,6 +8,7 @@ use std::io::{BufReader, Read};
 use walkdir::WalkDir;
 use log::{error, info};
 use regex::Regex;
+use urlencoding::decode;
 
 use crate::broker_proxy::BrokerProxy;
 use crate::db_proxy::DatabaseProxy;
@@ -41,12 +42,16 @@ impl FilesystemScanner {
 
                 let struct2 = ignore_struct.clone();
 
-                for path in ignore_struct?.paths? {
+                for path in ignore_struct?.paths.unwrap_or_default() {
                     if e_path.starts_with(path) { return Some(()) };
                 }
 
-                for pattern in struct2?.patterns? {
-                    let reg = Regex::new(pattern.as_str()).unwrap_or_else(
+                for pattern in struct2?.patterns.unwrap_or_default() {
+                    let decoded_pattern = decode(pattern.as_str()).unwrap();
+
+                    //todo: Remove this antipattern by storing regexes in a dictionary
+
+                    let reg = Regex::new(format!("{}", decoded_pattern).as_str()).unwrap_or_else(
                         |e: regex::Error| -> Regex {
                             error!("Cannot compile pattern: {} Reason: {}", pattern, e); 
                             panic!()

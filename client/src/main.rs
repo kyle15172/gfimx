@@ -35,9 +35,9 @@ fn main() {
     let config = toml::from_str::<Policy>(broker.get_policy().as_str());
 
     if let Err(reason) = &config {
-        broker.log(format!("Cannot parse policy: {}", reason));
+        error!("Cannot parse policy: {}", reason);
+        panic!()
     }
-
 
     let (watcher, runner) = build_monitors(config.unwrap(), broker, db.unwrap());
 
