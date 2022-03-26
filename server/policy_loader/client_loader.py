@@ -4,10 +4,11 @@ as name, unique key and name of policy file.
 """
 
 import logging
-import os
 import toml
 from pathlib import Path
 from typing import Optional, Dict, Tuple
+
+from utils import get_dir
 
 
 def load_client() -> Tuple[str, Dict[str, str]]:
@@ -16,11 +17,7 @@ def load_client() -> Tuple[str, Dict[str, str]]:
     policy_dir: Optional[str]
     clients: Dict[str, str]
 
-    try:
-        policy_dir = os.environ["GFIMX_POLICY_DIR"]
-    except KeyError:
-        logging.info("No policy directory given. Using /etc/gfimx/policy")
-        policy_dir = "/etc/gfimx/policy"
+    policy_dir = get_dir()
 
     try:
         clients = toml.load(Path(policy_dir) / "clients.toml")
@@ -28,7 +25,7 @@ def load_client() -> Tuple[str, Dict[str, str]]:
         logging.error(f"Could not load clients.toml: {e}")
         exit(1)
 
-    logging.info("Clients loaded")
+    logging.info("clients.toml loaded! Loading client policies...")
 
     for k, v in clients.items():
         yield (k, v)
