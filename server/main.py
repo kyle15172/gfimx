@@ -1,4 +1,5 @@
 import logging
+import time
 from broker import BrokerProxy
 from policy_loader import load_client, load_policy
 
@@ -10,3 +11,7 @@ if __name__ == "__main__":
 
     for client in load_client():
         load_policy(client, broker)
+
+    while True:
+        broker.get_logs()
+        time.sleep(1)

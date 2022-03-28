@@ -9,3 +9,7 @@ class IBroker(ABC):
     @abstractmethod
     def load_policy(self, client: str, policy: str) -> None:
         pass
+
+    @abstractmethod
+    def get_logs(self) -> None:
+        pass

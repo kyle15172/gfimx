@@ -9,3 +9,6 @@ class BrokerProxy:
 
     def load_policy(self, client: str, policy: str) -> None:
         self.broker.load_policy(client, policy)
+
+    def get_logs(self) -> None:
+        self.broker.get_logs()
