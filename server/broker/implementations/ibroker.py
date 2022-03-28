@@ -7,5 +7,5 @@ class IBroker(ABC):
         pass
 
     @abstractmethod
-    def load_policy(client: str, policy: str) -> None:
+    def load_policy(self, client: str, policy: str) -> None:
         pass

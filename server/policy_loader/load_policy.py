@@ -12,7 +12,7 @@ import re
 from utils import get_dir
 
 def load_policy(policy: Tuple[str, Dict[str, str]], broker: BrokerProxy) -> None:
-    logger.info(f"Loading policy for client {policy[0]}")
+    logger.info(f"Loading policy for client '{policy[0]}'")
 
     policy_dir = get_dir()
     
@@ -26,7 +26,9 @@ def load_policy(policy: Tuple[str, Dict[str, str]], broker: BrokerProxy) -> None
             for pattern in patterns:
                 validate_patterns(pattern)
 
-            logger.info(f"Policy for {policy[0]} loaded")
+            broker.load_policy(policy[0], policy_str)
+
+            logger.info(f"Policy for '{policy[0]}' loaded")
     except Exception as e:
         logger.error(f"Error in loading policy for {policy[0]}: {e}")
         exit(1)
