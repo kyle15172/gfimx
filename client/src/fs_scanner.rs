@@ -15,6 +15,13 @@ use crate::db_proxy::DatabaseProxy;
 use crate::file_metadata::FileMetadata;
 use crate::policy_structs::Ignore;
 
+/// Recursively scans files that fall under the provided path.
+/// If the provided path is a path to a file, it will just scan that file.
+/// 
+/// When scanning files, it will compare the file information to the 
+/// information that exists within the given database. If there is a mismatch,
+/// this mismatch is logged. However, if an explicit signal is given to
+/// update files, the data in the database will be updated with the new information.
 pub struct FilesystemScanner{
     _broker: BrokerProxy,
     database: DatabaseProxy
@@ -27,6 +34,15 @@ impl FilesystemScanner {
         FilesystemScanner { _broker: broker, database }
     }
 
+    /// Scans files in the provided path.
+    /// 
+    /// For each file, it's path is matched against the provided filters.
+    /// If the filters return a positive value, the file is ignored.
+    /// 
+    /// # Arguments
+    /// * `dir` - File or directory path to scan
+    /// * `ignore_files` - File filter
+    /// * `ignore_dirs` - Directory filter
     pub fn scan_dir(&mut self, dir: &str, ignore_files: &Option<Ignore>, ignore_dirs: &Option<Ignore>) {
         for entry in WalkDir::new(dir)
                 .follow_links(true)
@@ -40,13 +56,14 @@ impl FilesystemScanner {
 
             let pattern_filter = |ignore_struct: Option<Ignore>, e_path: &Path, e_pattern: &str| -> Option<()> {
 
-                let struct2 = ignore_struct.clone();
+                let ignore = ignore_struct?;
 
-                for path in ignore_struct?.paths.unwrap_or_default() {
+
+                for path in ignore.paths.unwrap_or_default() {
                     if e_path.starts_with(path) { return Some(()) };
                 }
 
-                for pattern in struct2?.patterns.unwrap_or_default() {
+                for pattern in ignore.patterns.unwrap_or_default() {
                     let decoded_pattern = decode(pattern.as_str()).unwrap();
 
                     //todo: Remove this antipattern by storing regexes in a dictionary

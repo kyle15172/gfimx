@@ -3,6 +3,7 @@ use std::fmt::Display;
 use serde_derive::{Serialize, Deserialize};
 use mongodb::bson::{Document, doc};
 
+/// Dataclass containing file information
 #[derive(Serialize, Deserialize, PartialEq, Eq)]
 pub struct FileMetadata {
     pub path: String,
@@ -13,6 +14,8 @@ pub struct FileMetadata {
 }
 
 impl FileMetadata {
+
+    /// Converts the `FileMetadata` object to a MongoDB `Document` object.
     pub fn to_doc(&self) -> Document {
         doc!{
             "path": self.path.clone(),

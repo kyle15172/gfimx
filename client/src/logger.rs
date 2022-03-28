@@ -2,6 +2,8 @@ use flexi_logger::{writers::LogWriter, DeferredNow, Record};
 
 use crate::broker_proxy::BrokerProxy;
 
+/// Custom LogWriter implementaion for `flexi_logger`, allowing
+/// logs to be written to a `BrokerProxy` object.
 pub struct BrokerLogWriter{
     broker: BrokerProxy
 }

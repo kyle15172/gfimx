@@ -1,4 +1,5 @@
 use std::{sync::{Arc, Mutex}, borrow::Borrow};
+use log::error;
 
 use crate::{
     policy_structs::Policy, 
@@ -9,9 +10,16 @@ use crate::{
     broker_proxy::BrokerProxy, db_proxy::DatabaseProxy
 };
 
+/// Builds a `DirWatcher` and `ScheduleRunner` object.
+/// 
+/// # Arguments
+/// * `policy` - `Policy` dataclass to build the monitors
+/// * `broker` - `BrokerProxy` object to use for message passing
+/// * `database` - `DatabaseProxy` object to store and retrieve file information
+/// 
+/// # Returns
+/// A tuple containing `DirWatcher` and `ScheduleRunner` optional objects.
 pub fn build_monitors(policy: Policy, broker: BrokerProxy, database: DatabaseProxy) -> (Option<DirWatcher>, Option<ScheduleRunner>) {
-
-    let mut _broker = broker.clone();
 
     let checker = Arc::new(Mutex::new(FilesystemScanner::new(broker, database)));
     let watcher: Option<DirWatcher> = if let Some(watch_policy) = policy.watch {
@@ -33,7 +41,7 @@ pub fn build_monitors(policy: Policy, broker: BrokerProxy, database: DatabasePro
 
         for sched in schedules.values() {
             if sched.cron.is_some() && sched.interval.is_some() {
-                _broker.log("Cannot have a schedule with both a cron and interval schedule!".to_owned());
+                error!("Cannot have a schedule with both a cron and interval schedule!");
                 panic!();
             }
 
@@ -48,7 +56,7 @@ pub fn build_monitors(policy: Policy, broker: BrokerProxy, database: DatabasePro
                 );
 
                 if let Err(reason) = new_sched {
-                    _broker.log(format!("Cannot make new CronSchedule: {}", reason));
+                    error!("Cannot make new CronSchedule: {}", reason);
                     panic!();
                 }
 
@@ -64,7 +72,7 @@ pub fn build_monitors(policy: Policy, broker: BrokerProxy, database: DatabasePro
                 );
 
                 if let Err(reason) = new_sched {
-                    _broker.log(format!("Cannot make new IntervalSchedule: {}", reason));
+                    error!("Cannot make new IntervalSchedule: {}", reason);
                     panic!();
                 }
 

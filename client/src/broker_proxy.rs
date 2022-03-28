@@ -7,15 +7,25 @@ const HOST: Option<&str> = option_env!("REDIS_HOST");
 const PORT: Option<&str> = option_env!("REDIS_PORT");
 const NAME: &str = env!("CLIENT_NAME", "Please add a name for the FIM client in config.toml");
 
+/// Trait that all Broker implementations will use
 trait BrokerImpl {
+
+    /// Retrieve the policy from the Broker
     fn get_policy(&self) -> String;
+
+    /// Log a message to the Broker
     fn log(&self, msg: String);
 }
 
+/// Enum for choosing which Broker to use
 pub enum BrokerType {
     Redis,    
 }
 
+/// Proxy object for the rest of the system to interface with brokers.
+/// 
+/// Holds an implementation class that it uses to perform the desired
+/// operation
 pub struct BrokerProxy {
     _impl: Arc<Mutex<dyn BrokerImpl + Send>>,
 }
@@ -28,10 +38,12 @@ impl BrokerProxy {
         BrokerProxy { _impl: b_type }
     }
 
+    /// Retrieve the policy from the Broker
     pub fn get_policy(&self) -> String {
         self._impl.lock().expect("Eish...").get_policy()
     }
 
+    /// Log a message to the Broker
     pub fn log(&self, msg: String) {
         self._impl.lock().expect("Eish...").log(msg);
     }
@@ -43,11 +55,14 @@ impl Clone for BrokerProxy {
     }
 }
 
+/// Redis implementation for `BrokerImpl`
 struct RedisBroker {
     _client: redis::Client
 }
 
 impl RedisBroker {
+
+    /// Connects to Redis and returns an instance of this object
     pub fn new() -> Self {
         let host = HOST.expect("REDIS_HOST variable not set!");
         let port = PORT.unwrap_or("6379");
@@ -60,6 +75,14 @@ impl RedisBroker {
         RedisBroker { _client: _client.unwrap() }
     }
 
+    /// Helper method to get a value from Redis
+    /// 
+    /// # Arguments
+    /// * `query` - The key to query
+    /// 
+    /// # Returns
+    /// * `Ok(String)` - The value returned from Redis if the query was successful
+    /// * `Err(RedisError)` - Error that Redis has thrown if an error occured
     fn _get(&self, query: &str) -> Result<String, RedisError> {
         let mut conn = match self._client.get_connection() {
             Ok(conn) => conn,
