@@ -12,6 +12,14 @@ from utils import get_dir
 
 
 def load_client() -> Tuple[str, Dict[str, str]]:
+    """
+    Generator that yields a Tuple containing the client name and their policy.
+    Each call of this function will return the next client in the 'clients.toml' file.
+
+    Returns:
+    --------
+    A tuple containing client name and client policy
+    """
     logging.info("Loading clients.toml...")
 
     policy_dir: Optional[str]

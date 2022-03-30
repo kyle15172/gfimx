@@ -12,6 +12,15 @@ import re
 from utils import get_dir
 
 def load_policy(policy: Tuple[str, Dict[str, str]], broker: BrokerProxy) -> None:
+    """
+    Accepts a tuple object containing the name of the client to apply the policy to and the
+    policy object, and loads it into the provided broker.
+
+    Parameters:
+    -----------
+      - policy - A tuple containing the client name and policy object
+      - broker - Broker object to load policy into
+    """
     logger.info(f"Loading policy for client '{policy[0]}'")
 
     policy_dir = get_dir()

@@ -2,6 +2,11 @@ from .ibroker import IBroker
 from redis import Redis
 
 class RedisBroker(IBroker):
+    """
+    Redis Broker implementation of the `IBroker` interface.
+
+    Uses Redis as it's service.
+    """
 
     redis: Redis
     log_state: int = 0
