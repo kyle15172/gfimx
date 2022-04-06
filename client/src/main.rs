@@ -21,8 +21,6 @@ use broker_proxy::{BrokerProxy, BrokerType};
 
 fn main() {
 
-    let broker = BrokerProxy::new(BrokerType::Redis);
-
     let log_bridge = match LoggerBridge::new(LoggerPlatforms::Redis) {
         Ok(val) => val,
         Err(reason) => panic!("{}", reason)
@@ -30,6 +28,8 @@ fn main() {
 
     let _logger = Logger::try_with_str("info").unwrap()
         .log_to_writer(Box::new(BrokerLogWriter::new(log_bridge))).start().expect("Eish...");
+
+    let broker = BrokerProxy::new(BrokerType::Redis);
 
     let db = DatabaseProxy::new(DatabaseType::MongoDB);
 

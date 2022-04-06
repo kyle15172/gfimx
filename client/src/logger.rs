@@ -68,10 +68,23 @@ impl RedisLogger {
 
         let _client = redis::Client::open(format!("redis://{}:{}/", host, port));
         if let Err(reason) = _client {
-            panic!("Could not connect to Redis! Reason: {}", reason);
+            panic!("Error creating Redis client: {}", reason)
         }
+        let client = _client.unwrap();
+
+        //checks if we can connect to redis
+        if let Err(reason) = client.get_connection() {
+            panic!("Could not connect to Redis! Reason: {}", reason)
+        }
+
+        let mut conn = client.get_connection().unwrap();
+
+        if let Err(reason) = redis::cmd("PING").query::<String>(&mut conn) {
+            panic!("Could not connect to Redis! Reason: {}", reason)
+        }
+
         RedisLogger { 
-            client: _client.unwrap(), 
+            client, 
             buffer: Mutex::new(RefCell::new(Vec::new()))
         }
     }

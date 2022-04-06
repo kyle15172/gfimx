@@ -68,10 +68,25 @@ impl RedisBroker {
 
         let _client = redis::Client::open(format!("redis://{}:{}/", host, port));
         if let Err(reason) = _client {
+            error!("Error creating Redis client: {}", reason);
+            panic!()
+        }
+        let client = _client.unwrap();
+
+        //checks if we can connect to redis
+        if let Err(reason) = client.get_connection() {
             error!("Could not connect to Redis! Reason: {}", reason);
             panic!()
         }
-        RedisBroker { _client: _client.unwrap() }
+
+        let mut conn = client.get_connection().unwrap();
+
+        if let Err(reason) = redis::cmd("PING").query::<String>(&mut conn) {
+            error!("Could not connect to Redis! Reason: {}", reason);
+            panic!()
+        }
+
+        RedisBroker { _client: client }
     }
 
     /// Helper method to get a value from Redis
