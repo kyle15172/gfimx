@@ -2,6 +2,8 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 use notify::Result;
 use data_encoding::HEXLOWER;
+use rand::Rng;
+use rand::distributions::Alphanumeric;
 use ring::digest::{Context, Digest, SHA256};
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -124,13 +126,14 @@ impl FilesystemScanner {
             }
 
             if remote.as_ref().unwrap().is_none() {
-                println!("{}", local);
-
+                info!("New file discovered: {}", local.path);
                 if let Err(reason) = self.database.upsert(local) {
                     error!("Could not upsert data! Reason: {}", reason);
                 }
             } else if remote.as_ref().unwrap().as_ref().unwrap() != &local {
-                println!("Old: {}\nNew: {}", remote.unwrap().unwrap(), local);
+                let event_id = gen_id();
+                error!("Critical: File integrity altered! Event ID: {}", event_id.clone());
+                self._broker.log_details(event_id, format!("Old: {}\nNew: {}", remote.unwrap().unwrap(), local));
                 if let Err(reason) = self.database.upsert(local) {
                     error!("Could not upsert data! Reason: {}", reason)
                 }
@@ -152,4 +155,12 @@ fn sha256_digest<R: Read>(mut reader: R) -> Result<Digest> {
     }
 
     Ok(context.finish())
+}
+
+fn gen_id() -> String {
+    rand::thread_rng()
+        .sample_iter(&Alphanumeric)
+        .take(7)
+        .map(char::from)
+        .collect()
 }

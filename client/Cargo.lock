@@ -674,6 +674,7 @@ dependencies = [
  "log",
  "mongodb",
  "notify",
+ "rand",
  "redis",
  "regex",
  "ring",

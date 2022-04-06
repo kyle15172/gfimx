@@ -13,8 +13,7 @@ trait BrokerImpl {
     /// Retrieve the policy from the Broker
     fn get_policy(&self) -> String;
 
-    /// Log a message to the Broker
-    fn log(&self, msg: String);
+    fn log_details(&self, name: String, value: String);
 }
 
 /// Enum for choosing which Broker to use
@@ -43,10 +42,10 @@ impl BrokerProxy {
         self._impl.lock().expect("Eish...").get_policy()
     }
 
-    /// Log a message to the Broker
-    pub fn log(&self, msg: String) {
-        self._impl.lock().expect("Eish...").log(msg);
+    pub fn log_details(&self, name: String, value: String) {
+        self._impl.lock().expect("Eish...").log_details(name, value)
     }
+
 }
 
 impl Clone for BrokerProxy {
@@ -91,6 +90,15 @@ impl RedisBroker {
 
         conn.get(query)
     }
+
+    fn _set(&self, key: &str, val: &str) -> Result<(), RedisError> {
+        let mut conn = match self._client.get_connection() {
+            Ok(conn) => conn,
+            Err(reason) => {error!("Failed to connect to Redis: Reason {}", reason); panic!()}
+        };
+
+        conn.set(key, val)
+    }
 }
 
 impl BrokerImpl for RedisBroker {
@@ -106,12 +114,12 @@ impl BrokerImpl for RedisBroker {
         val.unwrap()
     }
 
-    fn log(&self, msg: String) {
-        let mut conn = match self._client.get_connection() {
-            Ok(conn) => conn,
-            Err(reason) => {error!("Failed to connect to Redis: Reason {}", reason); panic!()}
-        };
+    fn log_details(&self, name: String, value: String) {
+        let result = self._set(name.as_str(), value.as_str());
 
-        let _: () = conn.lpush(format!("{}_log", NAME), msg).expect("Eish...");
-    }    
+        if let Err(reason) = result {
+            error!("Could not set value! Reason: {}", reason);
+            panic!();
+        }
+    }
 }
