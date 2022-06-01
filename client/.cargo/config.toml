@@ -1,4 +1,0 @@
-[env]
-REDIS_HOST = "192.168.0.107"
-MONGO_HOST = "192.168.0.107"
-CLIENT_NAME = "test"
