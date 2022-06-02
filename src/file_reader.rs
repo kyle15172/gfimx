@@ -1,49 +1,37 @@
-use std::{sync::mpsc::{Sender, RecvError}, fs::{self, File}, io::{BufReader, BufRead}};
+use std::{sync::{mpsc::{Sender, RecvError}, Arc, Mutex}, io::{BufRead, Error, ErrorKind}, collections::HashMap};
 
 use reflexive_queue::ReflexiveQueue;
 
+use crate::structs::FileProgress;
+
 pub struct FileReader {
-    queue: ReflexiveQueue<String, Vec<u8>>,
+    queue: ReflexiveQueue<FileProgress, Vec<u8>>,
+    data_pile: Arc<Mutex<HashMap<String, Vec<u8>>>>,
 }
 
 impl FileReader {
-    pub fn new() -> Self {
+    pub fn new(data_pile: Arc<Mutex<HashMap<String, Vec<u8>>>>) -> Self {
         let mut queue = ReflexiveQueue::new();
-        queue.transform(32, move|source, _, drainer| {
-            loop {
-                let val = source.recv();
-                if val.is_ok() {
-                    let file = File::open(val.unwrap());
-                    if file.is_err() {
-                        continue;
-                    }
-                    let mut reader = BufReader::with_capacity(4096, file.unwrap());
-
-                    loop {
-                        let length = {
-                            let buffer = reader.fill_buf();
-                            if buffer.is_ok() && drainer.is_some() {
-                                let buf = buffer.unwrap();
-                                let len = buf.len();
-                                let _ = drainer.as_ref().unwrap().send(Vec::from(buf));
-                                len
-                            } else {
-                                0
-                            }
-                        };
-                        if length == 0 {
-                            break;
-                        }
-                        reader.consume(length);
-                    }
-                }
+        queue.transform(4, move|mut prog: FileProgress, feedback, drainer| {            
+            let reader = &mut prog.file;
+            reader.seek_relative(prog.offset)?;
+            let buffer = reader.fill_buf()?;
+            let length = buffer.len();
+            let _ = drainer.ok_or(Error::new(ErrorKind::BrokenPipe, "No drain set"))?.send(Vec::from(buffer));
+            reader.consume(length);
+            prog.offset += length as i64;
+            prog.chunk_no += 1;
+            
+            if length > 0 {
+                feedback.send(prog);
             }
+            Ok(())
         });
-        FileReader { queue }
+        FileReader { queue, data_pile }
     }
 
-    pub fn add_drain(&mut self, drain: Sender<Vec<u8>>) {
-        self.queue.drain(drain);
+    pub fn set_drain(&mut self, drain: Sender<Vec<u8>>) {
+        self.queue.set_drain(drain);
     }
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>

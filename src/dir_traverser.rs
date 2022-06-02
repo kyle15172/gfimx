@@ -1,51 +1,38 @@
-use std::{sync::mpsc::{Sender, RecvError}, fs};
+use std::{sync::mpsc::{Sender, RecvError}, fs::{self, File}, io::{BufReader, Error, ErrorKind}};
 
 use reflexive_queue::ReflexiveQueue;
 
+use crate::structs::FileProgress;
+
 pub struct DirTraverser {
-    queue: ReflexiveQueue<String, String>,
+    queue: ReflexiveQueue<String, FileProgress>,
 }
 
 impl DirTraverser {
     pub fn new() -> Self {
         let mut queue = ReflexiveQueue::new();
-        queue.transform(32, move|source, feedback, drainer| {
-            loop {
-                let val = source.recv();
-                if val.is_ok() {
-                    let dir = val.unwrap();
-    
-                    println!("{}", &dir);
-    
-                    let paths_result = fs::read_dir(dir);
-    
-                    if paths_result.is_err() {
-                        continue;
-                    }
-    
-                    let paths = paths_result.unwrap();
-    
-                    for path in paths {
-    
-                        let _path = path.unwrap();
-    
-                        if _path.file_type().unwrap().is_symlink() {
-                            continue;
-                        }
-    
-                        let entry = fs::metadata(_path.path()).unwrap();
-                        if entry.is_dir() {
-                            let _ = feedback.send(_path.path().display().to_string());
-                        } else if entry.is_file() {
-                            let _ = if let Some(ref drain) = drainer {
-                                drain.send(_path.path().display().to_string())
-                            } else {
-                                Ok(())
-                            };
-                        }
-                    }
+        queue.transform(16, move|dir, feedback, drainer| {    
+            println!("{}", &dir);
+
+            let paths = fs::read_dir(dir)?;
+
+            for path in paths {
+
+                let _path = path?;
+
+                if _path.file_type()?.is_symlink() {
+                    continue;
+                }
+
+                let entry = fs::metadata(_path.path()).unwrap();
+                if entry.is_dir() {
+                    let _ = feedback.send(_path.path().display().to_string());
+                } else if entry.is_file() {
+                    let file = FileProgress::new(_path.path().display().to_string())?;
+                    let _ = drainer.as_ref().ok_or(Error::new(ErrorKind::BrokenPipe, "No drain set"))?.send(file);
                 }
             }
+            Ok(())
         });
         DirTraverser { queue }
     }
@@ -54,8 +41,8 @@ impl DirTraverser {
         self.queue.collector()
     }
 
-    pub fn add_drain(&mut self, drain: Sender<String>) {
-        self.queue.drain(drain);
+    pub fn set_drain(&mut self, drain: Sender<FileProgress>) {
+        self.queue.set_drain(drain);
     }
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>

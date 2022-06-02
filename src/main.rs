@@ -2,6 +2,7 @@ use dir_traverser::DirTraverser;
 
 mod dir_traverser;
 mod file_reader;
+mod structs;
 
 fn main() {
     let mut dt = DirTraverser::new();
