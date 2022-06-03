@@ -1,4 +1,5 @@
 use std::cell::Cell;
+use std::io::{Error, ErrorKind};
 use std::sync::{Mutex, Arc};
 use std::{thread, io};
 use std::time::Duration;
@@ -13,7 +14,7 @@ pub struct ReflexiveQueue<T, D> {
     drainer: Option<Sender<D>>,
 }
 
-impl<T: 'static + std::marker::Send, D: 'static + std::marker::Send> ReflexiveQueue<T, D> {
+impl<T: 'static + Send, D: 'static + Send> ReflexiveQueue<T, D> {
     pub fn new() -> Self {        
         let (tx, rx) = mpsc::channel();
         ReflexiveQueue{
@@ -25,12 +26,14 @@ impl<T: 'static + std::marker::Send, D: 'static + std::marker::Send> ReflexiveQu
         }
     }
 
-    pub fn transform<F>(&mut self, n_sinks: usize, sink_fn: F,) -> ()
-    where F: Fn(T, Sender<T>, Option<Sender<D>>) -> io::Result<()> + 'static + Copy + std::marker::Send
+    pub fn transform<F, S>(&mut self, n_sinks: usize, sink_fn: F, extern_state: S) -> ()
+    where F: Fn(T, Sender<T>, io::Result<Sender<D>>, S) -> io::Result<()> + 'static + Copy + Send,
+          S: 'static + Clone + Send
     {
         for _ in 0..n_sinks {
             let (tx, rx) = mpsc::channel();
             let own_sender = self.sender.clone();
+            let state = extern_state.clone();
             let drainer = self.drainer.clone();
             let run_lock = self.run.clone();
             self.transformers.push((thread::spawn(move || {
@@ -40,7 +43,11 @@ impl<T: 'static + std::marker::Send, D: 'static + std::marker::Send> ReflexiveQu
                         if val.is_err() {
                             break;
                         }
-                        if let Err(_) = sink_fn(val.unwrap(), own_sender.clone(), drainer.clone()) {
+                        let drainer_res = drainer.clone()
+                            .ok_or(Error::new(ErrorKind::BrokenPipe, "No drain set"));
+
+                        if let Err(e) = sink_fn(val.unwrap(), own_sender.clone(), drainer_res, state.clone()) {
+                            println!("{}", e);
                             break;
                         };
                     }

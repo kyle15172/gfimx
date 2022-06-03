@@ -1,4 +1,4 @@
-use std::{sync::mpsc::{Sender, RecvError}, fs::{self, File}, io::{BufReader, Error, ErrorKind}};
+use std::{sync::mpsc::{Sender, RecvError}, fs, io::{Error, self}};
 
 use reflexive_queue::ReflexiveQueue;
 
@@ -10,11 +10,36 @@ pub struct DirTraverser {
 
 impl DirTraverser {
     pub fn new() -> Self {
-        let mut queue = ReflexiveQueue::new();
-        queue.transform(16, move|dir, feedback, drainer| {    
+        let queue = ReflexiveQueue::new();
+        DirTraverser { queue }
+    }
+
+    pub fn collector(&self) -> Sender<String> {
+        self.queue.collector()
+    }
+
+    pub fn set_drain(&mut self, drain: Sender<FileProgress>) {
+        self.queue.set_drain(drain);
+    }
+    
+    pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
+    where F: Fn(Sender<(u64, bool)>) -> () {
+        self.queue.transform(16, move|dir, feedback, drainer, _| {    
             println!("{}", &dir);
 
+            let clone = |item: &io::Result<Sender<FileProgress>>| -> io::Result<Sender<FileProgress>> {
+                if item.is_ok() {
+                    Ok(item.as_ref().unwrap().clone())
+                } else {
+                    let e_kind = item.as_ref().unwrap_err().kind();
+                    let e_msg = item.as_ref().unwrap_err().to_string();
+                    Err(Error::new(e_kind, e_msg))
+                }
+            };
+
             let paths = fs::read_dir(dir)?;
+
+            let _drainer = &drainer;
 
             for path in paths {
 
@@ -29,24 +54,11 @@ impl DirTraverser {
                     let _ = feedback.send(_path.path().display().to_string());
                 } else if entry.is_file() {
                     let file = FileProgress::new(_path.path().display().to_string())?;
-                    let _ = drainer.as_ref().ok_or(Error::new(ErrorKind::BrokenPipe, "No drain set"))?.send(file);
+                    let _ = clone(_drainer)?.send(file);
                 }
             }
             Ok(())
-        });
-        DirTraverser { queue }
-    }
-
-    pub fn collector(&self) -> Sender<String> {
-        self.queue.collector()
-    }
-
-    pub fn set_drain(&mut self, drain: Sender<FileProgress>) {
-        self.queue.set_drain(drain);
-    }
-    
-    pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
-    where F: Fn(Sender<(u64, bool)>) -> () {
+        }, ());
         self.queue.run(timeout)
     }
 }

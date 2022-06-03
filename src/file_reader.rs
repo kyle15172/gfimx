@@ -1,41 +1,51 @@
-use std::{sync::{mpsc::{Sender, RecvError}, Arc, Mutex}, io::{BufRead, Error, ErrorKind}, collections::HashMap};
+use std::{sync::{mpsc::{Sender, RecvError}}, io::BufRead};
 
 use reflexive_queue::ReflexiveQueue;
 
-use crate::structs::FileProgress;
+use crate::structs::{FileProgress, FileChunk};
 
 pub struct FileReader {
-    queue: ReflexiveQueue<FileProgress, Vec<u8>>,
-    data_pile: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    queue: ReflexiveQueue<FileProgress, FileChunk>,
 }
 
 impl FileReader {
-    pub fn new(data_pile: Arc<Mutex<HashMap<String, Vec<u8>>>>) -> Self {
-        let mut queue = ReflexiveQueue::new();
-        queue.transform(4, move|mut prog: FileProgress, feedback, drainer| {            
-            let reader = &mut prog.file;
-            reader.seek_relative(prog.offset)?;
-            let buffer = reader.fill_buf()?;
-            let length = buffer.len();
-            let _ = drainer.ok_or(Error::new(ErrorKind::BrokenPipe, "No drain set"))?.send(Vec::from(buffer));
-            reader.consume(length);
-            prog.offset += length as i64;
-            prog.chunk_no += 1;
-            
-            if length > 0 {
-                feedback.send(prog);
-            }
-            Ok(())
-        });
-        FileReader { queue, data_pile }
+    pub fn new() -> Self {
+        let queue: ReflexiveQueue<FileProgress, FileChunk> = ReflexiveQueue::new();
+        FileReader { queue }
     }
 
-    pub fn set_drain(&mut self, drain: Sender<Vec<u8>>) {
+    pub fn set_drain(&mut self, drain: Sender<FileChunk>) {
         self.queue.set_drain(drain);
+    }
+
+    pub fn collector(&self) -> Sender<FileProgress> {
+        self.queue.collector()
     }
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
     where F: Fn(Sender<(u64, bool)>) -> () {
+        self.queue.transform(1, move|mut prog, feedback, drainer, _| {            
+            let reader = &mut prog.file;
+            let buffer = reader.fill_buf()?.to_vec();
+            let length = buffer.len();
+            reader.consume(length);
+            prog.chunk_no += 1;
+            let to_send = if prog.chunk_no >= prog.chunks && length == 0 {
+                FileChunk{
+                    file_name: prog.name.clone(),
+                    chunk: None
+                }
+            } else {
+                let name = prog.name.clone();
+                let _ = feedback.send(prog);
+                FileChunk {
+                    file_name: name,
+                    chunk: Some(buffer),
+                }
+            };
+            let _ = drainer?.send(to_send);
+            Ok(())
+        }, ());
         self.queue.run(timeout)
     }
 }
