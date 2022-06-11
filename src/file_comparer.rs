@@ -1,16 +1,16 @@
 use std::sync::mpsc::{Sender, RecvError};
 
-use reflexive_queue::ReflexiveQueue;
+use reflux::RefluxComputeNode;
 
 use crate::structs::FileHash;
 
 pub struct FileComparer {
-    queue: ReflexiveQueue<FileHash,  ()>,
+    queue: RefluxComputeNode<FileHash,  ()>,
 }
 
 impl FileComparer {
     pub fn new() -> Self {
-        let queue: ReflexiveQueue<FileHash,  ()> = ReflexiveQueue::new();
+        let queue: RefluxComputeNode<FileHash,  ()> = RefluxComputeNode::new();
         FileComparer { queue }
     }
 
@@ -20,7 +20,7 @@ impl FileComparer {
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
     where F: Fn(Sender<(u64, bool)>) -> () {
-        self.queue.transform(1, move|hash, _, _, _| {            
+        self.queue.set_computer(1, move|hash, _, _, _| {            
             println!("Name: {}\nHash:{}", hash.name, hash.hash);
             Ok(())
         }, ());

@@ -1,18 +1,18 @@
 use std::{sync::{mpsc::{Sender, RecvError}, RwLock, Arc, Mutex}, collections::HashMap};
 
-use reflexive_queue::ReflexiveQueue;
+use reflux::RefluxComputeNode;
 use sha2::{Sha256, Digest};
 use data_encoding::HEXLOWER;
 
 use crate::structs::{FileChunk, FileHash};
 
 pub struct FileHasher {
-    queue: ReflexiveQueue<FileChunk,  FileHash>,
+    queue: RefluxComputeNode<FileChunk,  FileHash>,
 }
 
 impl FileHasher {
     pub fn new() -> Self {
-        let queue: ReflexiveQueue<FileChunk, FileHash> = ReflexiveQueue::new();
+        let queue: RefluxComputeNode<FileChunk, FileHash> = RefluxComputeNode::new();
         FileHasher { queue }
     }
 
@@ -26,7 +26,7 @@ impl FileHasher {
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
     where F: Fn(Sender<(u64, bool)>) -> () {
-        self.queue.transform(1, move|chunk, _, drainer, data_pile| {            
+        self.queue.set_computer(1, move|chunk, _, drainer, data_pile| {            
             let is_present = {
                 data_pile.read().unwrap().get(&chunk.file_name).is_some()
             };

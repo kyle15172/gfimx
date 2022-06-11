@@ -67,7 +67,7 @@ name = "gfimx"
 version = "0.1.0"
 dependencies = [
  "data-encoding",
- "reflexive_queue",
+ "reflux",
  "sha2",
 ]
 
@@ -78,8 +78,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349d5a591cd28b49e1d1037471617a32ddcda5731b99419008085f72d5a53836"
 
 [[package]]
-name = "reflexive_queue"
+name = "reflux"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "13df6f5c87726896d4acd19cd9a8577e527d03c2c0861ef13393153f804baac9"
 
 [[package]]
 name = "sha2"

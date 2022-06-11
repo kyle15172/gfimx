@@ -1,16 +1,16 @@
 use std::{sync::mpsc::{Sender, RecvError}, fs, io::{Error, self}};
 
-use reflexive_queue::ReflexiveQueue;
+use reflux::RefluxComputeNode;
 
 use crate::structs::FileProgress;
 
 pub struct DirTraverser {
-    queue: ReflexiveQueue<String, FileProgress>,
+    queue: RefluxComputeNode<String, FileProgress>,
 }
 
 impl DirTraverser {
     pub fn new() -> Self {
-        let queue = ReflexiveQueue::new();
+        let queue = RefluxComputeNode::new();
         DirTraverser { queue }
     }
 
@@ -24,7 +24,7 @@ impl DirTraverser {
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
     where F: Fn(Sender<(u64, bool)>) -> () {
-        self.queue.transform(16, move|dir, feedback, drainer, _| {    
+        self.queue.set_computer(16, move|dir, feedback, drainer, _| {    
             println!("{}", &dir);
 
             let clone = |item: &io::Result<Sender<FileProgress>>| -> io::Result<Sender<FileProgress>> {

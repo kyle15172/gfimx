@@ -1,16 +1,16 @@
 use std::{sync::{mpsc::{Sender, RecvError}}, io::BufRead};
 
-use reflexive_queue::ReflexiveQueue;
+use reflux::RefluxComputeNode;
 
 use crate::structs::{FileProgress, FileChunk};
 
 pub struct FileReader {
-    queue: ReflexiveQueue<FileProgress, FileChunk>,
+    queue: RefluxComputeNode<FileProgress, FileChunk>,
 }
 
 impl FileReader {
     pub fn new() -> Self {
-        let queue: ReflexiveQueue<FileProgress, FileChunk> = ReflexiveQueue::new();
+        let queue: RefluxComputeNode<FileProgress, FileChunk> = RefluxComputeNode::new();
         FileReader { queue }
     }
 
@@ -24,7 +24,7 @@ impl FileReader {
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
     where F: Fn(Sender<(u64, bool)>) -> () {
-        self.queue.transform(1, move|mut prog, feedback, drainer, _| {            
+        self.queue.set_computer(1, move|mut prog, feedback, drainer, _| {            
             let reader = &mut prog.file;
             let buffer = reader.fill_buf()?.to_vec();
             let length = buffer.len();
