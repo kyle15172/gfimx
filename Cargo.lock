@@ -27,6 +27,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-channel"
+version = "0.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aaa7bd5fb665c6864b5f963dd9097905c54125909c7aa94c9e18507cdbe6c53"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-utils"
+version = "0.8.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0bf124c720b7686e3c2663cf54062ab0f68a88af2fb6a030e87e30bf721fcb38"
+dependencies = [
+ "cfg-if",
+ "lazy_static",
+]
+
+[[package]]
 name = "crypto-common"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -64,12 +84,20 @@ dependencies = [
 
 [[package]]
 name = "gfimx"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
+ "crossbeam-channel",
  "data-encoding",
+ "mbfs",
  "reflux",
  "sha2",
 ]
+
+[[package]]
+name = "lazy_static"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 
 [[package]]
 name = "libc"
@@ -78,10 +106,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "349d5a591cd28b49e1d1037471617a32ddcda5731b99419008085f72d5a53836"
 
 [[package]]
-name = "reflux"
-version = "0.1.0"
+name = "mbfs"
+version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13df6f5c87726896d4acd19cd9a8577e527d03c2c0861ef13393153f804baac9"
+checksum = "3dbdad6ef6afbc3498997ef19b8ef138f896a1e4568e70cb48428b6c1dd3fa8a"
+dependencies = [
+ "crossbeam-channel",
+]
+
+[[package]]
+name = "reflux"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77ff43df8f442da869c3cf9d3d92a55e1a4951acddc2635979ee175f7a5272da"
+dependencies = [
+ "crossbeam-channel",
+]
 
 [[package]]
 name = "sha2"

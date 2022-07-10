@@ -1,5 +1,5 @@
-use std::{sync::{mpsc::{Sender, RecvError}, RwLock, Arc, Mutex}, collections::HashMap};
-
+use std::{sync::{Arc, Mutex}, collections::HashMap};
+use crossbeam_channel::{Sender, RecvError};
 use reflux::RefluxComputeNode;
 use sha2::{Sha256, Digest};
 use data_encoding::HEXLOWER;
@@ -26,33 +26,40 @@ impl FileHasher {
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
     where F: Fn(Sender<(u64, bool)>) -> () {
-        self.queue.set_computer(1, move|chunk, _, drainer, data_pile| {            
+        self.queue.set_computers(16, move|chunk, _, drainer, data_pile| {    
+            let mut the_pile = data_pile.lock().unwrap();
+
             let is_present = {
-                data_pile.read().unwrap().get(&chunk.file_name).is_some()
+                the_pile.get(&chunk.file_name).is_some()
             };
             if is_present {
-                
-                let x = data_pile.read().unwrap();
-                let digest_guard = x.get(&chunk.file_name).unwrap();
-                
-                let mut digest = digest_guard.lock().unwrap();
-                match chunk.chunk {
-                    Some(data) => digest.update(data),
-                    None => {
-                        let x = digest.clone().finalize();
-                        let _ = drainer?.send(FileHash { name: chunk.file_name, hash: HEXLOWER.encode(x.as_ref())});
+                let mut to_delete = "".to_owned();
+                {
+                    let digest = the_pile.get_mut(&chunk.file_name).unwrap();
+                    match chunk.chunk {
+                        Some(data) => digest.update(data),
+                        None => {
+                            let x = digest.clone().finalize();
+                            to_delete = chunk.file_name.clone();
+                            let _ = drainer?.send(FileHash { name: chunk.file_name, hash: HEXLOWER.encode(x.as_ref())});
+                        }
                     }
                 }
+                if to_delete.len() > 0 {
+                    the_pile.remove(&to_delete);
+                }
             } else {
-                let mut x = data_pile.write().unwrap();
                 let mut hasher = Sha256::new();
-                hasher.update(chunk.chunk.unwrap());
-                x.insert(chunk.file_name, Mutex::new(hasher));
+                match chunk.chunk {
+                    Some(val) => hasher.update(val),
+                    None => {}
+                }
+                the_pile.insert(chunk.file_name, hasher);
             }
             Ok(())
-        }, Digests::new(RwLock::new(HashMap::new())));
+        }, Digests::new(Mutex::new(HashMap::new())));
         self.queue.run(timeout)
     }
 }
 
-type Digests = Arc<RwLock<HashMap<String, Mutex<Sha256>>>>;
+type Digests = Arc<Mutex<HashMap<String, Sha256>>>;

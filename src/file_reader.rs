@@ -1,16 +1,17 @@
-use std::{sync::{mpsc::{Sender, RecvError}}, io::BufRead};
-
+use crossbeam_channel::{Sender, RecvError};
+use mbfs::FileHandle;
 use reflux::RefluxComputeNode;
 
-use crate::structs::{FileProgress, FileChunk};
+use crate::structs::FileChunk;
+
 
 pub struct FileReader {
-    queue: RefluxComputeNode<FileProgress, FileChunk>,
+    queue: RefluxComputeNode<FileHandle, FileChunk>,
 }
 
 impl FileReader {
     pub fn new() -> Self {
-        let queue: RefluxComputeNode<FileProgress, FileChunk> = RefluxComputeNode::new();
+        let queue: RefluxComputeNode<FileHandle, FileChunk> = RefluxComputeNode::new();
         FileReader { queue }
     }
 
@@ -18,26 +19,23 @@ impl FileReader {
         self.queue.set_drain(drain);
     }
 
-    pub fn collector(&self) -> Sender<FileProgress> {
+    pub fn collector(&self) -> Sender<FileHandle> {
         self.queue.collector()
     }
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
     where F: Fn(Sender<(u64, bool)>) -> () {
-        self.queue.set_computer(1, move|mut prog, feedback, drainer, _| {            
-            let reader = &mut prog.file;
-            let buffer = reader.fill_buf()?.to_vec();
+        self.queue.set_computers(1, move|mut handle, feedback, drainer, _| {            
+            let buffer = handle.read()?;
             let length = buffer.len();
-            reader.consume(length);
-            prog.chunk_no += 1;
-            let to_send = if prog.chunk_no >= prog.chunks && length == 0 {
+            let to_send = if length == 0 {
                 FileChunk{
-                    file_name: prog.name.clone(),
+                    file_name: handle.get_name(),
                     chunk: None
                 }
             } else {
-                let name = prog.name.clone();
-                let _ = feedback.send(prog);
+                let name = handle.get_name();
+                let _ = feedback.send(handle);
                 FileChunk {
                     file_name: name,
                     chunk: Some(buffer),

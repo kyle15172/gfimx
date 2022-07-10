@@ -1,16 +1,15 @@
-use std::sync::mpsc::{Sender, RecvError};
-
+use crossbeam_channel::{Sender, RecvError};
 use reflux::RefluxComputeNode;
 
 use crate::structs::FileHash;
 
 pub struct FileComparer {
-    queue: RefluxComputeNode<FileHash,  ()>,
+    queue: RefluxComputeNode<FileHash, ()>,
 }
 
 impl FileComparer {
     pub fn new() -> Self {
-        let queue: RefluxComputeNode<FileHash,  ()> = RefluxComputeNode::new();
+        let queue: RefluxComputeNode<FileHash,()> = RefluxComputeNode::new();
         FileComparer { queue }
     }
 
@@ -20,8 +19,9 @@ impl FileComparer {
     
     pub fn run<F>(&mut self, timeout: F) -> Result<(), RecvError>
     where F: Fn(Sender<(u64, bool)>) -> () {
-        self.queue.set_computer(1, move|hash, _, _, _| {            
-            println!("Name: {}\nHash:{}", hash.name, hash.hash);
+        self.queue.set_computers(1, move|hash, _, _, _| {            
+            //println!("Name: {}\nHash:{}", hash.name, hash.hash);
+            drop(hash);
             Ok(())
         }, ());
         self.queue.run(timeout)
